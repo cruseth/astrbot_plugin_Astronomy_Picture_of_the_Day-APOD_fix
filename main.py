@@ -12,15 +12,16 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 
-@register("apod", "Cysheper", "NASA APOD plugin", "0.0.2")
+@register("apod", "cruseth", "NASA APOD plugin", "0.0.3")
 class APOD(Star):
     APOD_CACHE_KEY = "apod_cache"
     PUSH_LAST_SENT_DATE_KEY = "apod_push:last_sent_date"
+    PUSH_TARGET_SENT_KEY_PREFIX = "apod_push:target_sent:"
     PUSH_PAYLOAD_KEY_PREFIX = "apod_push:last_payload:"
 
     def __init__(self, context: Context, config: AstrBotConfig):
+        super().__init__(context)
         self.config = config
-        self.context = context
         self.last_apod_error: Optional[str] = None
         self.push_task: Optional[asyncio.Task] = None
 
@@ -63,6 +64,11 @@ class APOD(Star):
     @classmethod
     def _build_push_payload_cache_key(cls, apod_date: str) -> str:
         return f"{cls.PUSH_PAYLOAD_KEY_PREFIX}{apod_date}"
+
+    @classmethod
+    def _build_target_sent_cache_key(cls, target: str) -> str:
+        digest = hashlib.sha256(target.encode("utf-8")).hexdigest()
+        return f"{cls.PUSH_TARGET_SENT_KEY_PREFIX}{digest}"
 
     @staticmethod
     def _normalize_daily_push_time(value: Any) -> str:
@@ -118,7 +124,7 @@ class APOD(Star):
         # 如果启用了翻译但没有配置 provider，就提前提示。
         if self._needs_translation() and not self.provider:
             logger.warning(
-                "已启用翻译功能，但未配置 provider，请在插件配置中填写 `provider` 字段。"
+                "已启用翻译功能，但未配置 provider，将跳过翻译并发送 NASA 原文。"
             )
 
         if self.push_enabled and self.target_unified_msg_origins:
@@ -209,6 +215,19 @@ class APOD(Star):
             return targets[: self.max_groups_per_round]
         return targets
 
+    async def _get_unsent_targets(self, apod_date: str) -> List[str]:
+        unsent_targets = []
+        for target in self.target_unified_msg_origins:
+            sent_date = await self.get_cache(self._build_target_sent_cache_key(target))
+            if str(sent_date).strip() == apod_date:
+                logger.info(f"自动推送任务：会话 {target} 今日已推送过，跳过。")
+                continue
+            unsent_targets.append(target)
+
+        if self.max_groups_per_round > 0:
+            return unsent_targets[: self.max_groups_per_round]
+        return unsent_targets
+
     async def _get_or_build_push_payload(
         self, apod_data: Dict[str, Any], apod_date: str
     ) -> Dict[str, str]:
@@ -229,14 +248,13 @@ class APOD(Star):
         return payload
 
     async def _run_push_once(self):
-        targets = self._get_round_targets()
-        if not targets:
+        configured_targets = self._get_round_targets()
+        if not configured_targets:
             logger.info("自动推送任务：当前未配置可用 target_unified_msg_origins，跳过本轮。")
             return
 
         if self._needs_translation() and not self.provider:
-            logger.warning("自动推送任务：已启用翻译但未配置 provider，跳过本轮。")
-            return
+            logger.warning("自动推送任务：已启用翻译但未配置 provider，将发送 NASA 原文。")
 
         apod_data = await self.get_cache_apod()
         if not apod_data:
@@ -250,9 +268,9 @@ class APOD(Star):
             logger.warning("自动推送任务：APOD 数据缺少 date，跳过本轮。")
             return
 
-        last_sent_date = await self.get_cache(self.PUSH_LAST_SENT_DATE_KEY)
-        if str(last_sent_date).strip() == apod_date:
-            logger.info(f"自动推送任务：{apod_date} 已推送过，跳过重复推送。")
+        targets = await self._get_unsent_targets(apod_date)
+        if not targets:
+            logger.info(f"自动推送任务：{apod_date} 的所有目标会话均已推送过。")
             return
 
         validation_error = self._validate_apod_output(apod_data)
@@ -270,6 +288,7 @@ class APOD(Star):
         for target in targets:
             try:
                 await self.context.send_message(target, self._build_chain_from_payload(payload))
+                await self.put_cache(self._build_target_sent_cache_key(target), apod_date)
                 success_count += 1
             except Exception as exc:
                 logger.error(f"自动推送任务：向会话 {target} 发送失败：{exc}")
@@ -307,12 +326,8 @@ class APOD(Star):
 
         if self._needs_translation() and not self.provider:
             logger.warning(
-                "已启用翻译功能，但未配置 provider，请在插件配置中填写 `provider` 字段。"
+                "已启用翻译功能，但未配置 provider，将跳过翻译并发送 NASA 原文。"
             )
-            yield event.plain_result(
-                "已启用翻译功能，但未配置 provider，请在插件配置中填写 provider 字段。"
-            )
-            return
 
         # 如果今天的 APOD 缓存仍然有效，就优先复用缓存数据。
         apod_data = await self.get_cache_apod()
@@ -356,6 +371,13 @@ class APOD(Star):
             return
 
         yield event.chain_result(chain)
+
+    @filter.command("apod_push_now")
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    async def apod_push_now(self, event: AstrMessageEvent):
+        logger.info("收到手动触发 APOD 自动推送请求。")
+        await self._run_push_once()
+        yield event.plain_result("已执行一次 APOD 自动推送检查，请查看日志确认发送结果。")
 
     # 插件自带的 KV 存储足够保存 APOD 数据、推送状态和翻译结果。
     async def put_cache(self, key: str, value: Any):

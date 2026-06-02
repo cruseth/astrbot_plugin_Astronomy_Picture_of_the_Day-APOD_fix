@@ -13,7 +13,7 @@ AstrBot 的 NASA Astronomy Picture of the Day 插件。
 - 支持按 UMO 列表定向自动推送到指定群聊/会话
 - 内置 APOD 数据缓存，减少重复请求 NASA API
 - 内置翻译结果缓存，避免重复翻译相同文本
-- 内置推送状态与推送内容缓存，实现“拉取一次，发送多次”
+- 内置按目标会话记录的推送状态与推送内容缓存，实现“拉取一次，发送多次”
 - 支持超时和失败重试配置
 
 ## 适用版本
@@ -36,6 +36,12 @@ AstrBot 的 NASA Astronomy Picture of the Day 插件。
 
 ```text
 /sid
+```
+
+### 手动执行一次自动推送检查（管理员）
+
+```text
+/apod_push_now
 ```
 
 ## 配置说明
@@ -89,7 +95,7 @@ NASA API Token，用于访问 APOD API。
 说明：
 
 - 只有在开启翻译时才需要配置
-- 如果开启了标题或说明翻译，但没有配置 `provider`，插件将无法完成翻译
+- 如果开启了标题或说明翻译，但没有配置 `provider`，插件会跳过翻译并发送 NASA 原文
 
 ### `date`
 
@@ -143,7 +149,7 @@ NASA API 临时错误时的重试次数。
 说明：
 
 - UMO 可通过 `/sid` 获取
-- 到达 `daily_push_time` 后执行一次推送，并通过 APOD 日期去重避免重复发送
+- 到达 `daily_push_time` 后执行一次推送，并按目标会话记录 APOD 日期，避免重复发送且不影响失败目标后续重试
 - `daily_push_time` 使用运行 AstrBot 机器的本地时区
 
 ## 配置示例
@@ -207,7 +213,8 @@ NASA API 临时错误时的重试次数。
 
 ### 自动推送缓存
 
-- `apod_push:last_sent_date`：记录最近一次已推送的 APOD 日期
+- `apod_push:target_sent:<target_hash>`：按目标会话记录最近一次已推送的 APOD 日期
+- `apod_push:last_sent_date`：记录最近一次至少有一个目标成功推送的 APOD 日期，仅用于日志兼容
 - `apod_push:last_payload:<date>`：记录某天 APOD 的已组装推送内容
 - 一轮定时推送中只拉取一次 APOD，然后复用同一份内容推送给多个目标会话
 
@@ -242,7 +249,7 @@ NASA API 临时错误时的重试次数。
 
 ## 项目地址
 
-- Repository: <https://github.com/Cysheper/astrbot_plugin_Astronomy_Picture_of_the_Day-APOD>
+- Repository: <https://github.com/cruseth/astrbot_plugin_Astronomy_Picture_of_the_Day-APOD_fix>
 
 ## 致谢
 
