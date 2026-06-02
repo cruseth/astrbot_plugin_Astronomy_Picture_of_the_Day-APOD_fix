@@ -1,0 +1,1 @@
+# astrbot_plugin_Astronomy_Picture_of_the_Day-APOD_fix
