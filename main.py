@@ -12,7 +12,7 @@ from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 
 
-@register("apod", "cruseth", "NASA APOD plugin", "0.0.4")
+@register("apod", "cruseth", "NASA APOD plugin", "0.0.5")
 class APOD(Star):
     APOD_CACHE_KEY = "apod_cache"
     PUSH_LAST_SENT_DATE_KEY = "apod_push:last_sent_date"
@@ -197,16 +197,23 @@ class APOD(Star):
             "explanation": (explanation_zh or explanation or "").strip(),
         }
 
+    def _build_text_from_payload(self, payload: Dict[str, str]) -> str:
+        parts = []
+        if self.title.get("is_show") and payload.get("title"):
+            parts.append(f"标题：{payload['title']}")
+        if self.date.get("is_show") and payload.get("date"):
+            parts.append(f"日期：{payload['date']}")
+        if self.explanation.get("is_show") and payload.get("explanation"):
+            parts.append(payload["explanation"])
+        return "\n".join(parts)
+
     def _build_chain_from_payload(self, payload: Dict[str, str]) -> List[Any]:
         chain = []
         if self.image and payload.get("url"):
             chain.append(Comp.Image.fromURL(payload["url"]))
-        if self.title.get("is_show") and payload.get("title"):
-            chain.append(Comp.Plain(f"标题：{payload['title']}\n"))
-        if self.date.get("is_show") and payload.get("date"):
-            chain.append(Comp.Plain(f"日期：{payload['date']}\n"))
-        if self.explanation.get("is_show") and payload.get("explanation"):
-            chain.append(Comp.Plain(payload["explanation"]))
+        text = self._build_text_from_payload(payload)
+        if text:
+            chain.append(Comp.Plain(text))
         return chain
 
     def _build_message_chain_from_payload(self, payload: Dict[str, str]) -> MessageChain:
@@ -351,22 +358,17 @@ class APOD(Star):
 
         payload = await self._build_display_payload(apod_data)
 
-        # 如果配置为分开发送，就把内容拆成多条消息返回。
+        # 如果配置为分开发送，就把图片和文本拆成两条消息返回。
         if self.is_divided:
             has_output = False
 
             if self.image and payload.get("url"):
                 has_output = True
                 yield event.image_result(payload["url"])
-            if self.title.get("is_show") and payload.get("title"):
+            text = self._build_text_from_payload(payload)
+            if text:
                 has_output = True
-                yield event.plain_result(f"标题：{payload['title']}")
-            if self.date.get("is_show") and payload.get("date"):
-                has_output = True
-                yield event.plain_result(f"日期：{payload['date']}")
-            if self.explanation.get("is_show") and payload.get("explanation"):
-                has_output = True
-                yield event.plain_result(payload["explanation"])
+                yield event.plain_result(text)
             if not has_output:
                 yield event.plain_result("当前配置未启用任何可返回的内容。")
             return
