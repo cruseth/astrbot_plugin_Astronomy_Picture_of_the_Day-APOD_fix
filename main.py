@@ -8,11 +8,11 @@ import aiohttp
 
 import astrbot.api.message_components as Comp
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 
 
-@register("apod", "cruseth", "NASA APOD plugin", "0.0.3")
+@register("apod", "cruseth", "NASA APOD plugin", "0.0.4")
 class APOD(Star):
     APOD_CACHE_KEY = "apod_cache"
     PUSH_LAST_SENT_DATE_KEY = "apod_push:last_sent_date"
@@ -209,6 +209,11 @@ class APOD(Star):
             chain.append(Comp.Plain(payload["explanation"]))
         return chain
 
+    def _build_message_chain_from_payload(self, payload: Dict[str, str]) -> MessageChain:
+        message_chain = MessageChain()
+        message_chain.chain = self._build_chain_from_payload(payload)
+        return message_chain
+
     def _get_round_targets(self) -> List[str]:
         targets = list(self.target_unified_msg_origins)
         if self.max_groups_per_round > 0:
@@ -287,7 +292,9 @@ class APOD(Star):
 
         for target in targets:
             try:
-                await self.context.send_message(target, self._build_chain_from_payload(payload))
+                await self.context.send_message(
+                    target, self._build_message_chain_from_payload(payload)
+                )
                 await self.put_cache(self._build_target_sent_cache_key(target), apod_date)
                 success_count += 1
             except Exception as exc:

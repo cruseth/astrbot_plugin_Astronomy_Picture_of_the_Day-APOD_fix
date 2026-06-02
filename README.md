@@ -11,6 +11,7 @@ AstrBot 的 NASA Astronomy Picture of the Day 插件。
 - 支持将标题和说明翻译为简体中文
 - 支持分段发送或合并为一条消息链发送
 - 支持按 UMO 列表定向自动推送到指定群聊/会话
+- 主动推送使用 AstrBot `MessageChain`，兼容 AstrBot v4.25+
 - 内置 APOD 数据缓存，减少重复请求 NASA API
 - 内置翻译结果缓存，避免重复翻译相同文本
 - 内置按目标会话记录的推送状态与推送内容缓存，实现“拉取一次，发送多次”
