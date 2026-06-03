@@ -71,6 +71,12 @@
         "type": "int",
         "default": 120
     },
+    "proxy": {
+        "description": "NASA APOD API 请求代理",
+        "hint": "可选；留空则不使用代理。示例：http://127.0.0.1:7890 或 http://user:pass@127.0.0.1:7890",
+        "type": "string",
+        "default": ""
+    },
     "retry_count": {
         "description": "遇到 NASA API 临时错误时的重试次数",
         "type": "int",

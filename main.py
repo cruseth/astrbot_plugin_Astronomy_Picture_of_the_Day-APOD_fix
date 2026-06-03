@@ -12,7 +12,7 @@ from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 
 
-@register("apod", "cruseth", "NASA APOD plugin", "0.0.5")
+@register("apod", "cruseth", "NASA APOD plugin", "0.0.6")
 class APOD(Star):
     APOD_CACHE_KEY = "apod_cache"
     PUSH_LAST_SENT_DATE_KEY = "apod_push:last_sent_date"
@@ -110,6 +110,7 @@ class APOD(Star):
         self.is_divided = self.config.get("is_divided", True)
         self.timeout = max(1, int(self.config.get("timeout", 120)))
         self.retry_count = max(0, int(self.config.get("retry_count", 2)))
+        self.proxy = str(self.config.get("proxy", "") or "").strip()
 
         self.push = self._ensure_dict(self.config.get("push", {}))
         self.push_enabled = bool(self.push.get("enabled", True))
@@ -120,6 +121,9 @@ class APOD(Star):
             self.push.get("daily_push_time", "09:00")
         )
         self.max_groups_per_round = max(0, int(self.push.get("max_groups_per_round", 0)))
+
+        if self.proxy:
+            logger.info("APOD NASA API 请求已启用代理。")
 
         # 如果启用了翻译但没有配置 provider，就提前提示。
         if self._needs_translation() and not self.provider:
@@ -477,7 +481,7 @@ class APOD(Star):
         async with aiohttp.ClientSession(timeout=timeout) as session:
             for attempt in range(self.retry_count + 1):
                 try:
-                    async with session.get(base_url) as response:
+                    async with session.get(base_url, proxy=self.proxy or None) as response:
                         if response.status >= 400:
                             error_text = await response.text()
                             logger.error(

@@ -12,6 +12,7 @@ AstrBot 的 NASA Astronomy Picture of the Day 插件。
 - 支持图片和文本分开发送，标题、日期、说明会合并为一个文本段
 - 支持按 UMO 列表定向自动推送到指定群聊/会话
 - 主动推送使用 AstrBot `MessageChain`，兼容 AstrBot v4.25+
+- 支持为 NASA APOD API 请求配置 HTTP 代理
 - 内置 APOD 数据缓存，减少重复请求 NASA API
 - 内置翻译结果缓存，避免重复翻译相同文本
 - 内置按目标会话记录的推送状态与推送内容缓存，实现“拉取一次，发送多次”
@@ -127,6 +128,20 @@ NASA API Token，用于访问 APOD API。
 - 类型：`int`
 - 默认值：`120`
 
+### `proxy`
+
+NASA APOD API 请求代理。
+
+- 类型：`string`
+- 默认值：`""`
+
+说明：
+
+- 留空时不使用代理
+- 示例：`http://127.0.0.1:7890`
+- 如果 AstrBot 运行在 Docker 容器中，`127.0.0.1` 指容器内部，通常需要填写宿主机局域网 IP 或 Docker 可访问的代理地址
+- 该代理只用于拉取 NASA APOD API 数据；图片 URL 发送仍由 AstrBot/平台适配器处理
+
 ### `retry_count`
 
 NASA API 临时错误时的重试次数。
@@ -173,6 +188,7 @@ NASA API 临时错误时的重试次数。
   },
   "is_divided": true,
   "timeout": 120,
+  "proxy": "",
   "retry_count": 2,
   "push": {
     "enabled": true,
