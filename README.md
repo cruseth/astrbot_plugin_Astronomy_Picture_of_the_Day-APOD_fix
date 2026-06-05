@@ -11,6 +11,7 @@ AstrBot 的 NASA Astronomy Picture of the Day 插件。
 - 支持将标题和说明翻译为简体中文
 - 支持图片和文本分开发送，标题、日期、说明会合并为一个文本段
 - 支持按 UMO 列表定向自动推送到指定群聊/会话
+- 自动推送会遵循 `is_divided` 配置，和 `/apod` 命令保持相同发送逻辑
 - 主动推送使用 AstrBot `MessageChain`，兼容 AstrBot v4.25+
 - 支持为 NASA APOD API 请求配置 HTTP 代理
 - 内置 APOD 数据缓存，减少重复请求 NASA API
@@ -120,6 +121,7 @@ NASA API Token，用于访问 APOD API。
 
 - `true`：图片单独发送，标题、日期、说明合并为一个文本段发送
 - `false`：图片和文本会组合为一条消息链发送，文本部分仍为一个完整文本段
+- 该配置同时影响 `/apod` 命令和自动推送
 
 ### `timeout`
 

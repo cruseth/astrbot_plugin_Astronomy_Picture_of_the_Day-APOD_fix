@@ -12,7 +12,7 @@ from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 
 
-@register("apod", "cruseth", "NASA APOD plugin", "0.0.6")
+@register("apod", "cruseth", "NASA APOD plugin", "0.0.7")
 class APOD(Star):
     APOD_CACHE_KEY = "apod_cache"
     PUSH_LAST_SENT_DATE_KEY = "apod_push:last_sent_date"
@@ -225,6 +225,40 @@ class APOD(Star):
         message_chain.chain = self._build_chain_from_payload(payload)
         return message_chain
 
+    def _build_message_chain_from_components(self, components: List[Any]) -> MessageChain:
+        message_chain = MessageChain()
+        message_chain.chain = components
+        return message_chain
+
+    async def _send_payload_to_target(self, target: str, payload: Dict[str, str]):
+        if self.is_divided:
+            has_output = False
+            if self.image and payload.get("url"):
+                has_output = True
+                await self.context.send_message(
+                    target,
+                    self._build_message_chain_from_components(
+                        [Comp.Image.fromURL(payload["url"])]
+                    ),
+                )
+
+            text = self._build_text_from_payload(payload)
+            if text:
+                has_output = True
+                await self.context.send_message(
+                    target,
+                    self._build_message_chain_from_components([Comp.Plain(text)]),
+                )
+
+            if not has_output:
+                raise ValueError("当前配置未启用任何可发送内容。")
+            return
+
+        message_chain = self._build_message_chain_from_payload(payload)
+        if not message_chain.chain:
+            raise ValueError("当前配置未启用任何可发送内容。")
+        await self.context.send_message(target, message_chain)
+
     def _get_round_targets(self) -> List[str]:
         targets = list(self.target_unified_msg_origins)
         if self.max_groups_per_round > 0:
@@ -303,9 +337,7 @@ class APOD(Star):
 
         for target in targets:
             try:
-                await self.context.send_message(
-                    target, self._build_message_chain_from_payload(payload)
-                )
+                await self._send_payload_to_target(target, payload)
                 await self.put_cache(self._build_target_sent_cache_key(target), apod_date)
                 success_count += 1
             except Exception as exc:
